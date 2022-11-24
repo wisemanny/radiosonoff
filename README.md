@@ -8,4 +8,5 @@ A very simple command line tool to turn on or off radios in Windows. Supports Wi
 
 # TODO:
 
-Support multiple radios of the same kind. Now it would do the operation for all that it finds.
+1. Support multiple radios of the same kind. Now it would do the operation for all that it finds.
+2. Add operation to list devices
