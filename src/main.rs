@@ -1,35 +1,52 @@
 use std::env;
+use log::{debug};
 use windows::Devices::Radios::*;
+use env_logger;
 
-/* 
+/// String representation of RadioState enum
 fn state_to_str(state: RadioState) -> &'static str {
     match state {
         RadioState::On => "On",
         RadioState::Off => "Off",
         RadioState::Unknown => "Unknown",
         RadioState::Disabled => "Disabled",
-        _ => "Unknown enum value"
+        _ => "{Unknown enum value}"
     }
 }
-*/
 
+/// String representation of RadioAccessStatus enum
 fn access_to_str(access: RadioAccessStatus) -> &'static str {
     match access {
         RadioAccessStatus::Unspecified => "Unspecified",
         RadioAccessStatus::Allowed => "Allowed",
         RadioAccessStatus::DeniedByUser => "DeniedByUser",
         RadioAccessStatus::DeniedBySystem => "DeniedBySystem",
-        _ => "Unknown enum value"
+        _ => "{Unknown enum value}"
     }
 }
 
+/// String representation of RadioKind enum
+fn kind_to_str(kind: RadioKind) -> &'static str {
+    match kind {
+        RadioKind::Bluetooth => "Bluetooth",
+        RadioKind::WiFi => "WiFi",
+        RadioKind::FM => "FM",
+        RadioKind::MobileBroadband => "MobileBroadband",
+        RadioKind::Other => "Other",
+        _ => "{Unknown enum value}"
+    }
+}
+
+/// Well, the main
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
-    //dbg!(args.clone());
+    debug!("Command line parameters are: {:#?}", &args);
 
     if args.len() != 3 {
-        println!(r#"Not enough arguments to run the app. Please specify:
-<exefile> radio_kind <w for wifi and b for bluetooth> new_state <on or off>"#);
+        println!(r#"Not enough arguments to run the app. Please specify such parameters:
+<exefile> <radio kind: w for wifi and b for bluetooth> <new state: on or off"#);
         return;
     }
 
@@ -38,7 +55,7 @@ fn main() {
         "w" => RadioKind::WiFi,
         "b" => RadioKind::Bluetooth,
         _ => {
-            println!("Wrong kind requested '{}'", kind_arg);
+            println!("Requested kind parameter is unknown: '{}'", kind_arg);
             return;
             }
     };
@@ -48,7 +65,7 @@ fn main() {
         "on" => RadioState::On,
         "off" => RadioState::Off,
         _ => {
-            println!("Wrong state requested '{}'", new_state_arg);
+            println!("Requested state parameter is unknown '{}'", new_state_arg);
             return;
             }
     };
@@ -56,25 +73,26 @@ fn main() {
     // Get the list of radios
     let radios_async = match Radio::GetRadiosAsync() {
         Ok(async_call) => async_call,
-        Err(e) => {panic!("Error during get radios {}", e);}
+        Err(e) => {panic!("Error during getting a list of radios: {}", e);}
     };
     let radios_list = match radios_async.get() {
         Ok(res) => res,
-        Err(e) => {panic!("Error getting result {}", e)}
+        Err(e) => {panic!("Error getting result of querying a radio list: {}", e)}
     };
-
 
     // Cycle and make action
     for r in &radios_list {
+
         let name = r.Name().unwrap();
         let kind = r.Kind().unwrap();
         let state = r.State().unwrap();
+            
+        debug!("Found a radio instance: name={}, kind={}, state={}", name, kind_to_str(kind), state_to_str(state));
     
+        // If this is the requested kind and different state then make the change
         if kind == kind_selection {
-            //println!("name: {}", name);
-            //println!("kind: {:#?}", kind);
-            //println!("state: {:#?}", state);
             if state != new_state {
+                // Request change of the state
                 println!("Change state of radio {} to {}", name, new_state_arg);
                 let access_result = match r.SetStateAsync(new_state) {
                     Ok(async_call) => {
@@ -82,7 +100,7 @@ fn main() {
                         async_call.get().unwrap()
                     },
                     Err(e) => {
-                        println!("Error changing state {}", e);
+                        println!("Error changing state: {}", e);
                         return;
                     }
                 };
