@@ -4,7 +4,7 @@ A very simple command line tool to turn on or off radios in Windows. Supports Wi
 
 # How to use:
 
-radiosonoff.exe <w for wifi or b for bluetooth> <on/off>
+`radiosonoff.exe <w for wifi or b for bluetooth> <on/off>`
 
 # TODO:
 
