@@ -1,5 +1,5 @@
 use std::env;
-use log::{debug};
+use log::debug;
 use windows::Devices::Radios::*;
 use env_logger;
 
@@ -37,6 +37,14 @@ fn kind_to_str(kind: RadioKind) -> &'static str {
     }
 }
 
+/// Command line option requesting new state
+enum RequestedState {
+    /// When requested a new state
+    SingleState(RadioState), 
+    /// When requsted to put off state and then on state, i.e. powercycle
+    OffOn 
+}
+
 /// Well, the main
 fn main() {
     env_logger::init();
@@ -46,7 +54,7 @@ fn main() {
 
     if args.len() != 3 {
         println!(r#"Not enough arguments to run the app. Please specify such parameters:
-<exefile> <radio kind: w for wifi and b for bluetooth> <new state: on or off"#);
+<exefile> <radio kind: w for wifi and b for bluetooth> <new state: on or off or offon>"#);
         return;
     }
 
@@ -62,8 +70,9 @@ fn main() {
 
     let new_state_arg = &args[2];
     let new_state = match new_state_arg.as_str() {
-        "on" => RadioState::On,
-        "off" => RadioState::Off,
+        "on" => RequestedState::SingleState(RadioState::On),
+        "off" => RequestedState::SingleState(RadioState::Off),
+        "offon" => RequestedState::OffOn,
         _ => {
             println!("Requested state parameter is unknown '{}'", new_state_arg);
             return;
@@ -91,10 +100,35 @@ fn main() {
     
         // If this is the requested kind and different state then make the change
         if kind == kind_selection {
-            if state != new_state {
-                // Request change of the state
-                println!("Change state of radio {} to {}", name, new_state_arg);
-                let access_result = match r.SetStateAsync(new_state) {
+            if let RequestedState::SingleState(new_single_state) = new_state {
+                // We are asked to turn off or on
+                if state != new_single_state {
+                    // Request change of the state
+                    println!("Change state of radio {} to {}", name, new_state_arg);
+                    let access_result = match r.SetStateAsync(new_single_state) {
+                        Ok(async_call) => {
+                            println!("Done");
+                            async_call.get().unwrap()
+                        },
+                        Err(e) => {
+                            println!("Error changing state: {}", e);
+                            return;
+                        }
+                    };
+                    println!("Access result of the change is {}", access_to_str(access_result));
+                }
+                else
+                {
+                    println!("No change of the state is needed")
+                }
+            }
+            else if let RequestedState::OffOn = new_state {
+                // We are asked to power cycle
+                println!("Doing powercycle of the radio");
+
+                println!("Turning radio off");
+
+                let access_result_off = match r.SetStateAsync(RadioState::Off) {
                     Ok(async_call) => {
                         println!("Done");
                         async_call.get().unwrap()
@@ -104,11 +138,21 @@ fn main() {
                         return;
                     }
                 };
-                println!("Access result of the change is {}", access_to_str(access_result));
-            }
-            else
-            {
-                println!("No change of the state is needed")
+                
+                println!("Turning radio on");
+
+                let access_result_on = match r.SetStateAsync(RadioState::On) {
+                    Ok(async_call) => {
+                        println!("Done");
+                        async_call.get().unwrap()
+                    },
+                    Err(e) => {
+                        println!("Error changing state: {}", e);
+                        return;
+                    }
+                };
+                
+                println!("Access result of the change is {} for off and {} for on", access_to_str(access_result_off), access_to_str(access_result_on));
             }
         }
     };
